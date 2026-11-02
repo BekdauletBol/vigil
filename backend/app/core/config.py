@@ -24,6 +24,13 @@ class Settings(BaseSettings):
         SQLAlchemy async needs the asyncpg driver, and asyncpg takes `ssl=` instead of
         libpq's `sslmode=` and does not know `channel_binding`.
         """
+        v = v.strip()
+        if not v.startswith(("postgres://", "postgresql", "sqlite")):
+            scheme = v.split("://", 1)[0] if "://" in v else "?"
+            raise ValueError(
+                f"DATABASE_URL must be a PostgreSQL or SQLite URL (postgresql://…), got scheme "
+                f"'{scheme}'. In Neon copy the 'Postgres database' connection string, not the Data API URL."
+            )
         for prefix in ("postgres://", "postgresql://"):
             if v.startswith(prefix):
                 v = "postgresql+asyncpg://" + v[len(prefix) :]

@@ -107,3 +107,13 @@ def test_neon_style_url_is_adapted_for_asyncpg():
     assert Settings(database_url=url).database_url == (
         "postgresql+asyncpg://u:p@ep-x.neon.tech/db?ssl=require"
     )
+
+
+def test_non_database_url_fails_with_a_clear_message():
+    import pytest
+    from pydantic import ValidationError
+
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError, match="got scheme 'https'"):
+        Settings(database_url="https://ep-x.apirest.neon.tech/neondb/rest/v1")
