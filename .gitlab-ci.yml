@@ -1,0 +1,86 @@
+stages: [lint, test, build, docker]
+
+variables:
+  UV_CACHE_DIR: .uv-cache
+  npm_config_cache: .npm
+
+.backend:
+  image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+  before_script:
+    - cd backend
+    - uv sync --frozen
+  cache:
+    key: uv-${CI_COMMIT_REF_SLUG}
+    paths: [.uv-cache]
+
+.frontend:
+  image: node:22-alpine
+  before_script:
+    - cd frontend
+    - npm ci --no-audit --no-fund
+  cache:
+    key: npm-${CI_COMMIT_REF_SLUG}
+    paths: [.npm]
+
+backend:lint:
+  extends: .backend
+  stage: lint
+  script:
+    - uv run ruff check .
+    - uv run ruff format --check .
+
+frontend:lint:
+  extends: .frontend
+  stage: lint
+  script:
+    - npm run lint
+    - npm run typecheck
+
+backend:test:
+  extends: .backend
+  stage: test
+  services:
+    - name: postgres:17-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: vigil
+    POSTGRES_PASSWORD: vigil
+    POSTGRES_DB: vigil
+    TEST_DATABASE_URL: postgresql+asyncpg://vigil:vigil@postgres:5432/vigil
+    DATABASE_URL: postgresql+asyncpg://vigil:vigil@postgres:5432/vigil
+  script:
+    - uv run alembic upgrade head && uv run alembic check && uv run alembic downgrade base
+    - uv run pytest --cov=app --cov-report=term --junitxml=report.xml
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      junit: backend/report.xml
+
+frontend:test:
+  extends: .frontend
+  stage: test
+  script:
+    - npm run coverage
+
+frontend:build:
+  extends: .frontend
+  stage: build
+  script:
+    - npm run build
+  artifacts:
+    paths: [frontend/dist]
+    expire_in: 1 week
+
+docker:
+  stage: docker
+  image: docker:27
+  services: [docker:27-dind]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  parallel:
+    matrix:
+      - SERVICE: [backend, frontend]
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$CI_REGISTRY_IMAGE/$SERVICE:$CI_COMMIT_SHORT_SHA" -t "$CI_REGISTRY_IMAGE/$SERVICE:latest" "$SERVICE"
+    - docker push --all-tags "$CI_REGISTRY_IMAGE/$SERVICE"

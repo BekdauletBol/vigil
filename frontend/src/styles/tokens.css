@@ -1,0 +1,164 @@
+/*
+ * Design tokens modelled on Apple Human Interface Guidelines:
+ * semantic system colors, grouped backgrounds, label hierarchy, materials.
+ */
+:root {
+  color-scheme: light;
+
+  /* System colors (light) */
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --yellow: #ffcc00;
+  --green: #34c759;
+  --mint: #00c7be;
+  --teal: #30b0c7;
+  --cyan: #32ade6;
+  --blue: #007aff;
+  --indigo: #5856d6;
+  --purple: #af52de;
+  --pink: #ff2d55;
+  --gray: #8e8e93;
+
+  /* Backgrounds */
+  --bg: #f2f2f7;
+  --bg-elevated: #ffffff;
+  --bg-secondary: #f2f2f7;
+  --bg-tertiary: #ffffff;
+
+  /* Labels */
+  --label: #000000;
+  --label-2: rgba(60, 60, 67, 0.6);
+  --label-3: rgba(60, 60, 67, 0.3);
+  --label-4: rgba(60, 60, 67, 0.18);
+
+  /* Fills & separators */
+  --fill: rgba(120, 120, 128, 0.2);
+  --fill-2: rgba(120, 120, 128, 0.16);
+  --fill-3: rgba(118, 118, 128, 0.12);
+  --fill-4: rgba(116, 116, 128, 0.08);
+  --separator: rgba(60, 60, 67, 0.18);
+  --separator-opaque: #c6c6c8;
+
+  /* Materials (vibrancy) */
+  --material-bar: rgba(249, 249, 251, 0.78);
+  --material-sidebar: rgba(240, 240, 245, 0.72);
+  --material-thick: rgba(255, 255, 255, 0.86);
+  --material-backdrop: rgba(0, 0, 0, 0.28);
+
+  --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.03), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --shadow-3: 0 24px 80px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  --accent: var(--blue);
+  --on-accent: #ffffff;
+
+  /* Geometry */
+  --radius-xs: 6px;
+  --radius-s: 10px;
+  --radius-m: 14px;
+  --radius-l: 20px;
+  --sidebar-w: 264px;
+  --bar-h: 52px;
+  --tabbar-h: 56px;
+  --gutter: 28px;
+
+  /* Motion — iOS-like springs */
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-fast: 160ms;
+  --t-med: 280ms;
+  --t-slow: 480ms;
+
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter',
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-rounded: ui-rounded, 'SF Pro Rounded', var(--font);
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --yellow: #ffd60a;
+    --green: #30d158;
+    --mint: #63e6e2;
+    --teal: #40c8e0;
+    --cyan: #64d2ff;
+    --blue: #0a84ff;
+    --indigo: #5e5ce6;
+    --purple: #bf5af2;
+    --pink: #ff375f;
+    --gray: #8e8e93;
+    --bg: #000000;
+    --bg-elevated: #1c1c1e;
+    --bg-secondary: #1c1c1e;
+    --bg-tertiary: #2c2c2e;
+    --label: #ffffff;
+    --label-2: rgba(235, 235, 245, 0.6);
+    --label-3: rgba(235, 235, 245, 0.3);
+    --label-4: rgba(235, 235, 245, 0.16);
+    --fill: rgba(120, 120, 128, 0.36);
+    --fill-2: rgba(120, 120, 128, 0.32);
+    --fill-3: rgba(118, 118, 128, 0.24);
+    --fill-4: rgba(118, 118, 128, 0.18);
+    --separator: rgba(84, 84, 88, 0.6);
+    --separator-opaque: #38383a;
+    --material-bar: rgba(22, 22, 24, 0.74);
+    --material-sidebar: rgba(28, 28, 30, 0.7);
+    --material-thick: rgba(44, 44, 46, 0.86);
+    --material-backdrop: rgba(0, 0, 0, 0.55);
+    --shadow-1: 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+    --shadow-2: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 10px 40px rgba(0, 0, 0, 0.5);
+    --shadow-3: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 24px 80px rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --red: #ff453a;
+  --orange: #ff9f0a;
+  --yellow: #ffd60a;
+  --green: #30d158;
+  --mint: #63e6e2;
+  --teal: #40c8e0;
+  --cyan: #64d2ff;
+  --blue: #0a84ff;
+  --indigo: #5e5ce6;
+  --purple: #bf5af2;
+  --pink: #ff375f;
+  --gray: #8e8e93;
+  --bg: #000000;
+  --bg-elevated: #1c1c1e;
+  --bg-secondary: #1c1c1e;
+  --bg-tertiary: #2c2c2e;
+  --label: #ffffff;
+  --label-2: rgba(235, 235, 245, 0.6);
+  --label-3: rgba(235, 235, 245, 0.3);
+  --label-4: rgba(235, 235, 245, 0.16);
+  --fill: rgba(120, 120, 128, 0.36);
+  --fill-2: rgba(120, 120, 128, 0.32);
+  --fill-3: rgba(118, 118, 128, 0.24);
+  --fill-4: rgba(118, 118, 128, 0.18);
+  --separator: rgba(84, 84, 88, 0.6);
+  --separator-opaque: #38383a;
+  --material-bar: rgba(22, 22, 24, 0.74);
+  --material-sidebar: rgba(28, 28, 30, 0.7);
+  --material-thick: rgba(44, 44, 46, 0.86);
+  --material-backdrop: rgba(0, 0, 0, 0.55);
+  --shadow-1: 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+  --shadow-2: 0 0 0 0.5px rgba(255, 255, 255, 0.08), 0 10px 40px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 24px 80px rgba(0, 0, 0, 0.6);
+}
+
+/* Accent color (Settings → Accent) */
+:root[data-accent='indigo'] { --accent: var(--indigo); }
+:root[data-accent='purple'] { --accent: var(--purple); }
+:root[data-accent='pink'] { --accent: var(--pink); }
+:root[data-accent='orange'] { --accent: var(--orange); }
+:root[data-accent='green'] { --accent: var(--green); }
+:root[data-accent='teal'] { --accent: var(--teal); }
+
+@media (max-width: 899px) {
+  :root { --gutter: 16px; }
+}

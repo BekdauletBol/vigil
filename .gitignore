@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+*.db
+.uv-cache/
+
+# Node
+node_modules/
+dist/
+coverage/
+.npm/
+
+# Env & OS
+.env
+.DS_Store
+.idea/
+.vscode/
