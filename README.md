@@ -5,6 +5,12 @@ Fullstack-проект: система финансового мониторин
 операции и помогает аналитику разбирать их с помощью LLM (RAG).
 Интерфейс сделан по Apple Human Interface Guidelines.
 
+**Живое демо:** https://vigil-aml.onrender.com · [Swagger](https://vigil-aml.onrender.com/api/docs)
+<sub>(бесплатный тариф Render: после простоя первый запрос будит сервис ~1 минуту)</sub>
+
+[![CI](https://github.com/BekdauletBol/vigil/actions/workflows/ci.yml/badge.svg)](https://github.com/BekdauletBol/vigil/actions/workflows/ci.yml)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/BekdauletBol/vigil)
+
 > Все клиенты, банки и операции сгенерированы синтетически. Пороговые значения и база
 > знаний учебные и не являются нормативными документами.
 
@@ -126,6 +132,17 @@ docker compose up -d --build
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-... docker compose up -d
+```
+
+### Демо в одном контейнере (Render, Fly, HF Spaces)
+
+`Dockerfile.demo` собирает фронтенд и бэкенд в один образ: FastAPI отдаёт и API, и SPA,
+база — SQLite, шина событий — in-memory, скоринг — в запросе, симулятор встроен.
+Redis и Celery не нужны, образ укладывается в 512 МБ. `render.yaml` описывает
+сервис для деплоя в один клик.
+
+```bash
+docker build -f Dockerfile.demo -t vigil-demo . && docker run -p 8000:8000 vigil-demo
 ```
 
 ### Локально, без Docker

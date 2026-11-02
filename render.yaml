@@ -1,0 +1,15 @@
+# One-click deploy: https://render.com/deploy?repo=https://github.com/BekdauletBol/vigil
+services:
+  - type: web
+    name: vigil-aml
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.demo
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: LLM_PROVIDER
+        value: auto
+      - key: ANTHROPIC_API_KEY
+        sync: false # optional: set in the dashboard to enable Claude

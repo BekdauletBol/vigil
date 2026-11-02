@@ -1,11 +1,19 @@
 import uuid
-from datetime import datetime
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
 from app.db.models import AccountKind, AlertStatus, RiskLevel, Severity
 from app.services.risk import CHANNELS
+
+
+def _as_utc(dt: datetime) -> datetime:
+    # SQLite returns naive datetimes; without an offset browsers would read them as local time.
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+
+UTCDateTime = Annotated[datetime, AfterValidator(_as_utc)]
 
 
 class ORM(BaseModel):
@@ -31,7 +39,7 @@ class AccountOut(AccountBrief):
     city: str
     risk_level: RiskLevel
     is_pep: bool
-    opened_at: datetime
+    opened_at: UTCDateTime
 
     @field_validator("tax_id")
     @classmethod
@@ -67,7 +75,7 @@ class TransactionIn(BaseModel):
 
 class TransactionOut(ORM):
     id: uuid.UUID
-    ts: datetime
+    ts: UTCDateTime
     sender: AccountBrief
     receiver: AccountBrief
     amount: float
@@ -96,7 +104,7 @@ class NoteOut(ORM):
     author: str
     kind: str
     text: str
-    created_at: datetime
+    created_at: UTCDateTime
 
 
 class AlertOut(ORM):
@@ -107,8 +115,8 @@ class AlertOut(ORM):
     typology: str
     flags: list[FlagOut]
     assignee: str | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
     account: AccountBrief
     transaction: TransactionOut
 
@@ -151,7 +159,7 @@ class AlertPatch(BaseModel):
 
 
 class SeriesPoint(BaseModel):
-    t: datetime
+    t: UTCDateTime
     count: int
     volume: float
     flagged: int

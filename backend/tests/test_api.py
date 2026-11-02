@@ -191,3 +191,8 @@ def test_websocket_snapshot_then_live_transaction(app):
         msg = ws.receive_json()
         assert msg["type"] == "transaction"
         assert msg["data"]["id"] == r.json()["id"]
+
+
+async def test_datetimes_are_serialized_with_utc_offset(client):
+    tx = (await client.get("/api/v1/transactions", params={"limit": 1})).json()[0]
+    assert tx["ts"].endswith(("Z", "+00:00"))

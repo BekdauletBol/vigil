@@ -4,10 +4,12 @@ import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.ai.providers import make_provider
 from app.ai.retriever import get_retriever
@@ -88,11 +90,30 @@ def create_app(settings: Settings | None = None, *, create_tables: bool = False)
 
     for module in (health, accounts, transactions, alerts, stats, analyst, realtime):
         app.include_router(module.router, prefix="/api/v1")
+
+    if settings.static_dir:  # demo image: the API also serves the React build
+        mount_spa(app, Path(settings.static_dir))
     return app
 
 
+def mount_spa(app: FastAPI, root: Path) -> None:
+    root = root.resolve()
+    app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
+
+    # Plain `def`: FastAPI runs it in a thread pool, so the filesystem checks don't block the loop.
+    @app.get("/{path:path}", include_in_schema=False)
+    def spa(path: str):
+        if path.startswith("api/"):
+            raise HTTPException(404)
+        file = (root / path).resolve()
+        if path and file.is_file() and file.is_relative_to(root):
+            return FileResponse(file)
+        return FileResponse(root / "index.html")  # client-side routing
+
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+_settings = get_settings()
 app = create_app(
-    create_tables=get_settings().environment == "development"
-    and get_settings().database_url.startswith("sqlite")
+    create_tables=_settings.create_tables
+    or (_settings.environment == "development" and _settings.database_url.startswith("sqlite"))
 )

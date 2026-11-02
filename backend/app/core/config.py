@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Demo reporting threshold in KZT. Not a legal value — configurable per deployment.
     reporting_threshold: int = 7_000_000
 
+    # Single-container demo (Render/Fly): create tables without Alembic, serve the built SPA.
+    create_tables: bool = False
+    static_dir: str | None = None
+
     seed_on_startup: bool = True
     seed_accounts: int = 80
     seed_transactions: int = 1500
