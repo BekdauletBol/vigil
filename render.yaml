@@ -4,6 +4,7 @@ services:
     name: vigil-aml
     runtime: docker
     plan: free
+    region: frankfurt # closest Render region to Central Asia; keep the database there too
     dockerfilePath: ./Dockerfile.demo
     dockerContext: .
     healthCheckPath: /api/v1/health
