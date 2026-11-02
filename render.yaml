@@ -1,4 +1,12 @@
 # One-click deploy: https://render.com/deploy?repo=https://github.com/BekdauletBol/vigil
+databases:
+  # Free PostgreSQL keeps registered users and their workspaces across restarts.
+  # Note: Render's free databases expire after 30 days unless upgraded.
+  - name: vigil-db
+    plan: free
+    databaseName: vigil
+    user: vigil
+
 services:
   - type: web
     name: vigil-aml
@@ -9,6 +17,12 @@ services:
     healthCheckPath: /api/v1/health
     autoDeploy: true
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vigil-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
       - key: LLM_PROVIDER
         value: auto
       - key: ANTHROPIC_API_KEY

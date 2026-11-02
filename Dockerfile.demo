@@ -2,6 +2,7 @@
 # Single-container demo for free hosting (Render / Fly / HF Spaces):
 # FastAPI serves the API and the React build; SQLite, in-memory event bus,
 # inline scoring and the embedded transaction simulator. No Redis/Celery needed.
+# DATABASE_URL may point to PostgreSQL so registered users survive restarts.
 FROM node:22-alpine AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
@@ -26,10 +27,11 @@ ENV DATABASE_URL=sqlite+aiosqlite:////data/vigil.db \
     SCORING_MODE=inline \
     CREATE_TABLES=true \
     EMBEDDED_SIMULATOR=true \
-    SIMULATOR_RATE=0.8 \
+    SIMULATOR_RATE=0.5 \
     SEED_RECENT_PER_MINUTE=25 \
     STATIC_DIR=/app/static \
     ENVIRONMENT=production
 
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
+COPY --chmod=755 start-demo.sh /app/start-demo.sh
+CMD ["/app/start-demo.sh"]

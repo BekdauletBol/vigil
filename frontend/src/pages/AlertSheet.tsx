@@ -53,7 +53,7 @@ export function AlertSheet({ id, onClose }: { id: number; onClose: () => void })
       }
       onClose={onClose}
       actions={
-        <button type="button" className="btn btn--tinted" onClick={() => navigate(`/analyst?alert=${id}`)}>
+        <button type="button" className="btn btn--tinted" onClick={() => navigate(`/app/analyst?alert=${id}`)}>
           <Icon name="sparkles" size={15} />
           <span className="hide-sm">AI-заключение</span>
         </button>

@@ -45,7 +45,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         color: 'var(--indigo)',
         run: () => setPref('appearance', prefs.appearance === 'dark' ? 'light' : 'dark'),
       },
-      { id: 'ask', group: 'Действия', label: 'Спросить AI-аналитика', icon: 'sparkles', color: 'var(--purple)', run: go('/analyst') },
+      { id: 'ask', group: 'Действия', label: 'Спросить AI-аналитика', icon: 'sparkles', color: 'var(--purple)', run: go('/app/analyst') },
       { id: 'docs', group: 'Действия', label: 'Открыть документацию API', hint: 'Swagger UI', icon: 'doc', color: 'var(--gray)', run: () => window.open('/api/docs', '_blank') },
     ]
     const needle = q.trim().toLowerCase()
@@ -59,7 +59,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
             hint: `${a.typology} · ${formatKZT(a.transaction.amount, { compact: true })}`,
             icon: 'alert' as const,
             color: 'var(--red)',
-            run: go(`/alerts/${a.id}`),
+            run: go(`/app/alerts/${a.id}`),
           }))
         : []
     return [...pages.filter(match), ...actions.filter(match), ...alerts]

@@ -50,10 +50,11 @@ export async function streamSSE(
   body: unknown,
   onEvent: (e: SSEEvent) => void,
   signal?: AbortSignal,
+  headers: Record<string, string> = {},
 ): Promise<void> {
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...headers },
     body: JSON.stringify(body),
     signal,
   })

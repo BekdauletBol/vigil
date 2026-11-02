@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,15 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://vigil:vigil@localhost:5432/vigil"
     redis_url: str = "redis://localhost:6379/0"
+
+    @field_validator("database_url")
+    @classmethod
+    def async_driver(cls, v: str) -> str:
+        # Hosting providers hand out plain postgres:// URLs; SQLAlchemy async needs asyncpg.
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+asyncpg://" + v[len(prefix) :]
+        return v
 
     # "redis" fans events out across API replicas and the Celery worker;
     # "memory" is a single-process bus for tests and quick local runs.
@@ -38,6 +48,15 @@ class Settings(BaseSettings):
     # Runs the transaction simulator inside the API process (handy without Docker).
     embedded_simulator: bool = False
     simulator_rate: float = 1.5  # transactions per second
+
+    # Auth. Set JWT_SECRET in production; the default only suits local development.
+    jwt_secret: str = "dev-only-insecure-secret-change-me-in-production"
+    jwt_ttl_hours: int = 24 * 7
+
+    # Private-workspace simulators switch themselves off after this many minutes.
+    workspace_simulator_minutes: int = 30
+    # Demo history older than this is pruned so a small hosted database never fills up.
+    demo_retention_hours: int = 48
 
     # LLM analyst. "auto" picks Anthropic when a key is set, otherwise the offline mock.
     llm_provider: Literal["auto", "anthropic", "ollama", "mock"] = "auto"

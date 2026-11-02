@@ -83,3 +83,18 @@ def test_ml_model_ranks_outlier_above_typical_payment():
         )
     )
     assert 0 <= typical < 0.5 < outlier <= 1
+
+
+def test_database_url_gets_async_driver():
+    from app.core.config import Settings
+
+    assert (
+        Settings(database_url="postgres://u:p@h/db").database_url == "postgresql+asyncpg://u:p@h/db"
+    )
+    assert (
+        Settings(database_url="postgresql://u:p@h/db").database_url
+        == "postgresql+asyncpg://u:p@h/db"
+    )
+    assert (
+        Settings(database_url="sqlite+aiosqlite:///x.db").database_url == "sqlite+aiosqlite:///x.db"
+    )

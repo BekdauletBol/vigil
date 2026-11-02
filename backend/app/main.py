@@ -13,13 +13,23 @@ from fastapi.staticfiles import StaticFiles
 
 from app.ai.providers import make_provider
 from app.ai.retriever import get_retriever
-from app.api.routes import accounts, alerts, analyst, health, realtime, stats, transactions
+from app.api.routes import (
+    accounts,
+    alerts,
+    analyst,
+    auth,
+    health,
+    realtime,
+    stats,
+    transactions,
+    workspaces,
+)
 from app.core.config import Settings, get_settings
 from app.db.models import Base
 from app.db.session import SessionLocal, engine
 from app.ml.anomaly import get_model
 from app.realtime.bus import make_bus
-from app.seed import seed
+from app.seed import ensure_demo_workspace, seed
 from app.services.errors import DomainError
 
 log = logging.getLogger("vigil")
@@ -38,15 +48,20 @@ def create_app(settings: Settings | None = None, *, create_tables: bool = False)
         if create_tables:  # dev/test shortcut; production schema is managed by Alembic
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
-        if settings.seed_on_startup:
-            async with SessionLocal() as session:
+        async with SessionLocal() as session:
+            if settings.seed_on_startup:
                 await seed(session, settings)
+            else:
+                await ensure_demo_workspace(session)
 
-        sim = None
+        from app.simulator import prune_demo_history, run_embedded, run_workspace_simulators
+
+        background = [
+            asyncio.create_task(run_workspace_simulators(settings, app.state.bus)),
+            asyncio.create_task(prune_demo_history(settings)),
+        ]
         if settings.embedded_simulator:
-            from app.simulator import run_embedded
-
-            sim = asyncio.create_task(run_embedded(settings, app.state.bus))
+            background.append(asyncio.create_task(run_embedded(settings, app.state.bus)))
         log.info(
             "Vigil API ready (bus=%s, scoring=%s, llm=%s)",
             settings.event_bus,
@@ -54,10 +69,10 @@ def create_app(settings: Settings | None = None, *, create_tables: bool = False)
             app.state.llm.name,
         )
         yield
-        if sim:
-            sim.cancel()
+        for task in background:
+            task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
-                await sim
+                await task
         await app.state.bus.close()
 
     app = FastAPI(
@@ -88,7 +103,17 @@ def create_app(settings: Settings | None = None, *, create_tables: bool = False)
     async def domain_error(_: Request, exc: DomainError):
         return JSONResponse({"detail": str(exc)}, status_code=exc.status_code)
 
-    for module in (health, accounts, transactions, alerts, stats, analyst, realtime):
+    for module in (
+        health,
+        auth,
+        workspaces,
+        accounts,
+        transactions,
+        alerts,
+        stats,
+        analyst,
+        realtime,
+    ):
         app.include_router(module.router, prefix="/api/v1")
 
     if settings.static_dir:  # demo image: the API also serves the React build

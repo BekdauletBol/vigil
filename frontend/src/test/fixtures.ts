@@ -4,8 +4,8 @@ export function tx(overrides: Partial<Transaction> = {}): Transaction {
   return {
     id: crypto.randomUUID(),
     ts: new Date().toISOString(),
-    sender: { id: 'ACC-1', name: 'Сериков Айдар', kind: 'individual', bank: 'Есиль Банк', country: 'KZ' },
-    receiver: { id: 'ACC-2', name: 'ТОО «Дала Трейд»', kind: 'legal', bank: 'Алатау Финанс', country: 'KZ' },
+    sender: { id: 'ACC-1', code: 'ACC-1', name: 'Сериков Айдар', kind: 'individual', bank: 'Есиль Банк', country: 'KZ' },
+    receiver: { id: 'ACC-2', code: 'ACC-2', name: 'ТОО «Дала Трейд»', kind: 'legal', bank: 'Алатау Финанс', country: 'KZ' },
     amount: 150_000,
     currency: 'KZT',
     channel: 'transfer',

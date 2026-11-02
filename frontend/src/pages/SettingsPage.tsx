@@ -4,6 +4,7 @@ import { SegmentedControl, Switch } from '../components/controls'
 import { Icon, type IconName } from '../components/Icon'
 import { Page } from '../components/Layout'
 import { ACCENTS, usePrefs, type Appearance } from '../theme/PrefsProvider'
+import { WorkspaceSettings } from './WorkspaceSettings'
 
 function IconRow({ icon, color, label, children }: { icon: IconName; color: string; label: string; children: React.ReactNode }) {
   return (
@@ -24,6 +25,7 @@ export function SettingsPage() {
   return (
     <Page title="Настройки">
       <div className="settings">
+        <WorkspaceSettings />
         <section>
           <div className="list-group__title">Оформление</div>
           <div className="list-group">

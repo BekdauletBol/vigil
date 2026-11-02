@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api/client'
 import type { ChatMessage, Source } from '../api/types'
 import { streamSSE } from '../lib/sse'
+import { authHeaders } from '../session/store'
 
 export interface UIMessage extends ChatMessage {
   id: number
@@ -55,6 +56,7 @@ export function useAnalystChat(alertId: number | null) {
             else if (event === 'error') patch(assistant.id, (m) => ({ ...m, error: body.message }))
           },
           ac.signal,
+          authHeaders(),
         )
       } catch (e) {
         if (!ac.signal.aborted) patch(assistant.id, (m) => ({ ...m, error: e instanceof Error ? e.message : String(e) }))

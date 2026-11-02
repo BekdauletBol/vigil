@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 
 from app.ai.analyst import prepare_context, run_analyst
 from app.ai.retriever import get_retriever
-from app.api.deps import ProviderDep, SessionDep
+from app.api.deps import ProviderDep, SessionDep, WorkspaceDep
 from app.schemas import ChatRequest
 
 router = APIRouter(tags=["analyst"])
@@ -16,9 +16,9 @@ def sse(event: str, data: dict) -> str:
 
 
 @router.post("/analyst/chat")
-async def chat(req: ChatRequest, session: SessionDep, provider: ProviderDep):
+async def chat(req: ChatRequest, session: SessionDep, provider: ProviderDep, ws: WorkspaceDep):
     """Stream the analyst's answer as Server-Sent Events: `meta`, `delta`…, `done` | `error`."""
-    context = await prepare_context(session, req)
+    context = await prepare_context(session, ws.id, req)
 
     async def events():
         try:

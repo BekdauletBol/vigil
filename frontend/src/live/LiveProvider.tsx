@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useSyncExternalStore, ty
 import { API_BASE } from '../api/client'
 import type { Transaction } from '../api/types'
 import { backoffDelay } from '../lib/backoff'
+import { authQuery } from '../session/store'
 import { LiveStore } from './liveStore'
 
 const LiveContext = createContext<LiveStore | null>(null)
@@ -13,9 +14,9 @@ type ServerMessage =
   | { type: 'heartbeat' }
 
 function socketUrl() {
-  if (/^wss?:/.test(API_BASE)) return `${API_BASE}/ws/transactions`
+  if (/^wss?:/.test(API_BASE)) return `${API_BASE}/ws/transactions${authQuery()}`
   const base = API_BASE.startsWith('http') ? API_BASE.replace(/^http/, 'ws') : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${API_BASE}`
-  return `${base}/ws/transactions`
+  return `${base}/ws/transactions${authQuery()}`
 }
 
 /** Owns the single WebSocket connection: reconnects with jittered backoff, measures latency. */

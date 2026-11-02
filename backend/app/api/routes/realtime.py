@@ -2,12 +2,13 @@ import asyncio
 import contextlib
 import json
 
-from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import BusDep
+from app.api.deps import BusDep, WorkspaceDep, _int_or_none, resolve_workspace
+from app.core.config import get_settings
 from app.db.session import SessionLocal
-from app.realtime.bus import CHANNEL_ALERTS, CHANNEL_TRANSACTIONS
+from app.realtime.bus import alerts_channel, transactions_channel
 from app.realtime.streams import subscribe_with_heartbeat
 from app.schemas import TransactionOut
 from app.services.transactions import recent_transactions
@@ -17,11 +18,26 @@ router = APIRouter(tags=["realtime"])
 
 @router.websocket("/ws/transactions")
 async def transactions_ws(ws: WebSocket) -> None:
-    """Live transaction feed. Sends a snapshot first, then every scored transaction."""
+    """Live transaction feed of one workspace: a snapshot first, then every scored transaction.
+
+    Browsers cannot set headers on WebSockets, so the workspace and token come as query params.
+    """
+    async with SessionLocal() as session:
+        try:
+            workspace = await resolve_workspace(
+                session,
+                get_settings(),
+                workspace_id=_int_or_none(ws.query_params.get("workspace")),
+                token=ws.query_params.get("token"),
+                api_key=None,
+            )
+        except HTTPException:
+            await ws.close(code=4401)
+            return
+        snapshot = await recent_transactions(session, workspace.id, limit=40)
+
     await ws.accept()
     bus = ws.app.state.bus
-    async with SessionLocal() as session:
-        snapshot = await recent_transactions(session, limit=40)
     await ws.send_json(
         {
             "type": "snapshot",
@@ -30,7 +46,7 @@ async def transactions_ws(ws: WebSocket) -> None:
     )
 
     async def relay() -> None:
-        async for event in subscribe_with_heartbeat(bus, CHANNEL_TRANSACTIONS, 20):
+        async for event in subscribe_with_heartbeat(bus, transactions_channel(workspace.id), 20):
             await ws.send_json(event or {"type": "heartbeat"})
 
     async def receive() -> None:
@@ -55,18 +71,20 @@ async def transactions_ws(ws: WebSocket) -> None:
 
 
 @router.get("/events")
-async def alert_events(request: Request, bus: BusDep):
+async def alert_events(request: Request, bus: BusDep, ws: WorkspaceDep):
     """Server-Sent Events stream of case updates (`alert.created`, `alert.updated`)."""
+    channel = alerts_channel(ws.id)
 
     async def stream():
         yield "retry: 3000\n\n"
-        async for event in subscribe_with_heartbeat(bus, CHANNEL_ALERTS, 15):
+        async for event in subscribe_with_heartbeat(bus, channel, 15):
             if await request.is_disconnected():
                 break
             if event is None:
                 yield ": keep-alive\n\n"
             else:
-                yield f"event: {event['type']}\ndata: {json.dumps(event['data'], ensure_ascii=False)}\n\n"
+                data = json.dumps(event["data"], ensure_ascii=False)
+                yield f"event: {event['type']}\ndata: {data}\n\n"
 
     return StreamingResponse(
         stream(),

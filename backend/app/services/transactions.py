@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.db.models import Account, Alert, AlertNote, AlertStatus, Transaction, TxStatus
 from app.ml.anomaly import get_model
-from app.realtime.bus import CHANNEL_ALERTS, CHANNEL_TRANSACTIONS, EventBus
+from app.realtime.bus import EventBus, alerts_channel, transactions_channel
 from app.schemas import AlertOut, TransactionIn, TransactionOut
-from app.services.errors import NotFoundError
+from app.services.errors import ConflictError, NotFoundError
 from app.services.risk import ALERT_THRESHOLD, TxFeatures, evaluate
 
 VELOCITY_WINDOW = timedelta(minutes=10)
@@ -21,24 +21,40 @@ def as_utc(dt: datetime) -> datetime:
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
 
 
-async def ingest(session: AsyncSession, data: TransactionIn) -> Transaction:
+async def account_by_code(session: AsyncSession, workspace_id: int, code: str) -> Account | None:
+    return await session.scalar(
+        select(Account).where(Account.workspace_id == workspace_id, Account.code == code)
+    )
+
+
+async def ingest(session: AsyncSession, workspace_id: int, data: TransactionIn) -> Transaction:
     if data.external_id:
         existing = await session.scalar(
-            select(Transaction).where(Transaction.external_id == data.external_id)
+            select(Transaction).where(
+                Transaction.workspace_id == workspace_id,
+                Transaction.external_id == data.external_id,
+            )
         )
         if existing:  # idempotent re-delivery from the external system
             return existing
 
-    for account_id in (data.sender_id, data.receiver_id):
-        if await session.get(Account, account_id) is None:
-            raise NotFoundError(f"Account {account_id} not found")
+    parties = []
+    for code in (data.sender_id, data.receiver_id):
+        account = await account_by_code(session, workspace_id, code)
+        if account is None:
+            raise NotFoundError(f"Client {code} not found in this workspace")
+        parties.append(account)
+    sender, receiver = parties
+    if sender.id == receiver.id:
+        raise ConflictError("Sender and receiver must be different clients")
 
     tx = Transaction(
         id=uuid.uuid4(),
+        workspace_id=workspace_id,
         external_id=data.external_id,
         ts=data.ts or datetime.now(UTC),
-        sender_id=data.sender_id,
-        receiver_id=data.receiver_id,
+        sender_id=sender.id,
+        receiver_id=receiver.id,
         amount=data.amount,
         currency=data.currency,
         channel=data.channel,
@@ -119,6 +135,7 @@ async def score(
             merged.updated_at = datetime.now(UTC)
         else:
             alert = Alert(
+                workspace_id=tx.workspace_id,
                 transaction_id=tx.id,
                 account_id=tx.sender_id,
                 severity=result.severity,
@@ -130,14 +147,14 @@ async def score(
     await session.commit()
 
     await bus.publish(
-        CHANNEL_TRANSACTIONS,
+        transactions_channel(tx.workspace_id),
         {"type": "transaction", "data": TransactionOut.model_validate(tx).model_dump(mode="json")},
     )
     if alert is not None:
         alert = await session.scalar(select(Alert).where(Alert.id == alert.id))
         assert alert is not None
         await bus.publish(
-            CHANNEL_ALERTS,
+            alerts_channel(tx.workspace_id),
             {
                 "type": "alert.created",
                 "data": AlertOut.model_validate(alert).model_dump(mode="json"),
@@ -146,7 +163,7 @@ async def score(
     if merged is not None:
         await session.refresh(merged)
         await bus.publish(
-            CHANNEL_ALERTS,
+            alerts_channel(tx.workspace_id),
             {
                 "type": "alert.updated",
                 "data": AlertOut.model_validate(merged).model_dump(mode="json"),
@@ -173,11 +190,15 @@ async def _active_case(
 
 
 async def recent_transactions(
-    session: AsyncSession, limit: int = 50, min_score: int = 0
+    session: AsyncSession, workspace_id: int, limit: int = 50, min_score: int = 0
 ) -> list[Transaction]:
     rows = await session.scalars(
         select(Transaction)
-        .where(Transaction.status == TxStatus.scored, Transaction.risk_score >= min_score)
+        .where(
+            Transaction.workspace_id == workspace_id,
+            Transaction.status == TxStatus.scored,
+            Transaction.risk_score >= min_score,
+        )
         .order_by(Transaction.ts.desc())
         .limit(limit)
     )
@@ -185,12 +206,18 @@ async def recent_transactions(
 
 
 async def submit(
-    session: AsyncSession, data: TransactionIn, bus: EventBus, settings: Settings
+    session: AsyncSession,
+    workspace_id: int,
+    data: TransactionIn,
+    bus: EventBus,
+    settings: Settings,
+    *,
+    inline: bool = False,
 ) -> Transaction:
     """Persist a transaction, then score it inline or hand it to a Celery worker."""
-    tx = await ingest(session, data)
+    tx = await ingest(session, workspace_id, data)
     if tx.status == TxStatus.pending:
-        if settings.scoring_mode == "inline":
+        if inline or settings.scoring_mode == "inline":
             tx, _ = await score(session, tx.id, bus, settings)
         else:
             from app.worker.tasks import score_transaction

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from app.db.models import AccountKind, AlertStatus, RiskLevel, Severity
 from app.services.risk import CHANNELS
@@ -28,6 +28,7 @@ class FlagOut(BaseModel):
 
 class AccountBrief(ORM):
     id: str
+    code: str
     name: str
     kind: AccountKind
     bank: str
@@ -51,8 +52,8 @@ class TransactionIn(BaseModel):
     """Payload accepted from external systems (banks, payment processors)."""
 
     external_id: str | None = Field(default=None, max_length=64)
-    sender_id: str
-    receiver_id: str
+    sender_id: str = Field(description="Sender's client code in this workspace")
+    receiver_id: str = Field(description="Receiver's client code in this workspace")
     amount: float = Field(gt=0, le=10_000_000_000)
     currency: Literal["KZT"] = "KZT"
     channel: str
@@ -92,6 +93,7 @@ class TransactionOut(ORM):
 class IngestAccepted(BaseModel):
     id: uuid.UUID
     status: str
+    risk_score: int | None = None
 
 
 class NoteIn(BaseModel):
@@ -187,3 +189,81 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     alert_id: int | None = None
     messages: list[ChatMessage] = Field(min_length=1, max_length=40)
+
+
+class AccountIn(BaseModel):
+    code: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[\w\-.]+$")
+    name: str = Field(min_length=2, max_length=200)
+    kind: AccountKind = AccountKind.individual
+    tax_id: str = Field(default="", max_length=12, pattern=r"^\d{0,12}$")
+    bank: str = Field(default="", max_length=100)
+    country: str = Field(default="KZ", min_length=2, max_length=2)
+    city: str = Field(default="", max_length=80)
+    is_pep: bool = False
+    opened_at: datetime | None = None
+
+    @field_validator("country")
+    @classmethod
+    def upper(cls, v: str) -> str:
+        return v.upper()
+
+
+class UserOut(ORM):
+    id: int
+    email: str
+    name: str
+
+
+class RegisterIn(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    name: str = Field(min_length=1, max_length=80)
+
+
+class LoginIn(BaseModel):
+    email: EmailStr
+    password: str = Field(max_length=128)
+
+
+class WorkspaceOut(ORM):
+    id: int
+    name: str
+    kind: str
+    api_key_prefix: str | None
+    simulator_until: UTCDateTime | None
+    created_at: UTCDateTime
+    accounts: int = 0
+    transactions: int = 0
+
+
+class AuthOut(BaseModel):
+    token: str
+    user: UserOut
+    workspaces: list[WorkspaceOut]
+
+
+class WorkspaceIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class WorkspacePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    simulator: bool | None = None
+
+
+class ApiKeyOut(BaseModel):
+    api_key: str
+    prefix: str
+
+
+class ImportRowError(BaseModel):
+    row: int
+    message: str
+
+
+class ImportResult(BaseModel):
+    imported: int
+    duplicates: int
+    created_clients: int
+    alerts: int
+    errors: list[ImportRowError]

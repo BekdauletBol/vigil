@@ -87,7 +87,7 @@ export function AlertsPage() {
             type="button"
             className="alert-row"
             style={{ ['--c' as string]: SEV_COLOR[a.severity] }}
-            onClick={() => navigate({ pathname: `/alerts/${a.id}`, search: params.toString() })}
+            onClick={() => navigate({ pathname: `/app/alerts/${a.id}`, search: params.toString() })}
           >
             <span className="alert-row__stripe" />
             <span className="alert-row__id hide-sm">#{a.id}</span>
@@ -122,7 +122,7 @@ export function AlertsPage() {
         ))}
       </section>
 
-      {id && <AlertSheet id={Number(id)} onClose={() => navigate({ pathname: '/alerts', search: params.toString() })} />}
+      {id && <AlertSheet id={Number(id)} onClose={() => navigate({ pathname: '/app/alerts', search: params.toString() })} />}
     </Page>
   )
 }

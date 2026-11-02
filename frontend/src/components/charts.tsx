@@ -182,7 +182,7 @@ export function ActivityRings({ rings, size = 150 }: { rings: Ring[]; size?: num
           return (
             <g key={r.label} transform={`rotate(-90 ${size / 2} ${size / 2})`}>
               <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={r.color} strokeOpacity={0.18} strokeWidth={stroke} />
-              <circle
+              {v > 0 && <circle
                 cx={size / 2}
                 cy={size / 2}
                 r={radius}
@@ -192,7 +192,7 @@ export function ActivityRings({ rings, size = 150 }: { rings: Ring[]; size?: num
                 strokeLinecap="round"
                 strokeDasharray={`${c * v} ${c}`}
                 style={{ transition: 'stroke-dasharray 900ms var(--spring)' }}
-              />
+              />}
             </g>
           )
         })}

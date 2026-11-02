@@ -14,8 +14,13 @@ from collections.abc import AsyncIterator
 
 import redis.asyncio as redis
 
-CHANNEL_TRANSACTIONS = "vigil:transactions"
-CHANNEL_ALERTS = "vigil:alerts"
+
+def transactions_channel(workspace_id: int) -> str:
+    return f"vigil:ws:{workspace_id}:transactions"
+
+
+def alerts_channel(workspace_id: int) -> str:
+    return f"vigil:ws:{workspace_id}:alerts"
 
 
 class EventBus(ABC):

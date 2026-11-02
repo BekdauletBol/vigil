@@ -4,9 +4,9 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { App } from './App'
 import { ToastProvider } from './components/Toasts'
-import { LiveProvider } from './live/LiveProvider'
 import './styles/tokens.css'
 import './styles/app.css'
+import { SessionProvider } from './session/SessionProvider'
 import { PrefsProvider } from './theme/PrefsProvider'
 
 const queryClient = new QueryClient({
@@ -19,9 +19,9 @@ createRoot(document.getElementById('root')!).render(
       <PrefsProvider>
         <BrowserRouter>
           <ToastProvider>
-            <LiveProvider>
+            <SessionProvider>
               <App />
-            </LiveProvider>
+            </SessionProvider>
           </ToastProvider>
         </BrowserRouter>
       </PrefsProvider>

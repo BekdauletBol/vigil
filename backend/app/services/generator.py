@@ -15,6 +15,8 @@ CHANNEL_WEIGHTS = {"transfer": 36, "card": 34, "cash": 8, "swift": 6, "p2p": 15,
 @dataclass
 class AccountSeed:
     id: str
+    workspace_id: int
+    code: str
     name: str
     kind: AccountKind
     tax_id: str
@@ -26,36 +28,49 @@ class AccountSeed:
     opened_at: datetime
 
 
-def make_accounts(rng: random.Random, n: int, now: datetime) -> list[AccountSeed]:
+def risk_level_for(country: str, is_pep: bool, account_age_days: int) -> RiskLevel:
+    """Initial client risk profile (KYC-style), used for seeded and user-created clients."""
+    if country in HIGH_RISK_COUNTRIES or is_pep:
+        return RiskLevel.high
+    if country != "KZ" or account_age_days < 30:
+        return RiskLevel.medium
+    return RiskLevel.low
+
+
+def make_accounts(
+    rng: random.Random,
+    n: int,
+    now: datetime,
+    *,
+    workspace_id: int = 1,
+    start: int = 0,
+    id_prefix: str = "ACC-",
+    code_prefix: str = "ACC-",
+) -> list[AccountSeed]:
     foreign = list(ref.FOREIGN.items())
     out: list[AccountSeed] = []
-    for i in range(n):
+    for i in range(start, start + n):
         is_foreign = i % 8 == 7
         country, city = rng.choice(foreign) if is_foreign else ("KZ", rng.choice(ref.CITIES))
         kind = AccountKind.legal if rng.random() < 0.45 or is_foreign else AccountKind.individual
         name = ref.company_name(rng) if kind == AccountKind.legal else ref.person_name(rng)
         is_pep = kind == AccountKind.individual and rng.random() < 0.06
         new = rng.random() < 0.08
-        risk = (
-            RiskLevel.high
-            if country in HIGH_RISK_COUNTRIES or is_pep
-            else RiskLevel.medium
-            if is_foreign or new
-            else RiskLevel.low
-        )
+        age_days = rng.randint(3, 20) if new else rng.randint(60, 3000)
         out.append(
             AccountSeed(
-                id=f"ACC-{i + 1:05d}",
+                id=f"{id_prefix}{i + 1:05d}",
+                workspace_id=workspace_id,
+                code=f"{code_prefix}{i + 1:05d}",
                 name=name,
                 kind=kind,
                 tax_id=ref.tax_id(rng),
                 bank=rng.choice(ref.BANKS) if country == "KZ" else f"Foreign Bank ({country})",
                 country=country,
                 city=city,
-                risk_level=risk,
+                risk_level=risk_level_for(country, is_pep, age_days),
                 is_pep=is_pep,
-                opened_at=now
-                - timedelta(days=rng.randint(3, 20) if new else rng.randint(60, 3000)),
+                opened_at=now - timedelta(days=age_days),
             )
         )
     return out
@@ -79,8 +94,8 @@ def scenario(
 
     def tx(sender, receiver, amount, channel, offset_s=0, purpose=None) -> dict:
         return {
-            "sender_id": sender.id,
-            "receiver_id": receiver.id,
+            "sender_id": sender.code,
+            "receiver_id": receiver.code,
             "amount": float(amount),
             "channel": channel,
             "country": receiver.country,

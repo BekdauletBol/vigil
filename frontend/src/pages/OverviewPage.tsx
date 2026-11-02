@@ -6,7 +6,7 @@ import { ActivityRings, AreaChart, BarList, Sparkline } from '../components/char
 import { SegmentedControl } from '../components/controls'
 import { Icon, type IconName } from '../components/Icon'
 import { LivePill, Page } from '../components/Layout'
-import { formatKZT, formatNumber, formatRelative } from '../lib/format'
+import { formatKZT, formatNumber, formatRelative, pluralize } from '../lib/format'
 import { CHANNEL } from '../lib/labels'
 import { useLive } from '../live/LiveProvider'
 
@@ -69,8 +69,8 @@ export function OverviewPage() {
           <>
             <Kpi icon="transfer" color="var(--blue)" label="Операции, 24 ч" value={formatNumber(s.tx_count_24h)} caption={`${rate} в минуту сейчас`} spark={s.series.map((p) => p.count)} />
             <Kpi icon="banknote" color="var(--green)" label="Объём, 24 ч" value={formatKZT(s.volume_24h, { compact: true })} caption="Все каналы" spark={s.series.map((p) => p.volume)} />
-            <Kpi icon="alert" color="var(--red)" label="Открытые алерты" value={formatNumber(s.open_alerts)} caption={`${s.critical_alerts} критических`} spark={s.series.map((p) => p.flagged)} />
-            <Kpi icon="shield" color="var(--orange)" label="Средний риск" value={s.avg_risk_24h.toFixed(1)} unit="/100" caption={`${formatNumber(s.flagged_24h)} операций с флагами`} />
+            <Kpi icon="alert" color="var(--red)" label="Открытые алерты" value={formatNumber(s.open_alerts)} caption={`${s.critical_alerts} ${pluralize(s.critical_alerts, ['критический', 'критических', 'критических'])}`} spark={s.series.map((p) => p.flagged)} />
+            <Kpi icon="shield" color="var(--orange)" label="Средний риск" value={s.avg_risk_24h.toFixed(1)} unit="/100" caption={`${formatNumber(s.flagged_24h)} ${pluralize(s.flagged_24h, ['операция', 'операции', 'операций'])} с флагами`} />
           </>
         )}
       </div>
@@ -150,13 +150,13 @@ export function OverviewPage() {
       <section className="card card--flush">
         <div className="card__header">
           <h2 className="headline">Критические алерты без исполнителя</h2>
-          <Link to="/alerts" className="btn btn--plain">
+          <Link to="/app/alerts" className="btn btn--plain">
             Все алерты
           </Link>
         </div>
         <div style={{ paddingTop: 8 }}>
           {(critical?.items ?? []).slice(0, 5).map((a) => (
-            <Link key={a.id} to={`/alerts/${a.id}`} className="list-row list-row--icon">
+            <Link key={a.id} to={`/app/alerts/${a.id}`} className="list-row list-row--icon">
               <ScorePill score={a.score} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div className="truncate" style={{ fontWeight: 500 }}>

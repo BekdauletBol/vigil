@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useStats } from '../api/queries'
 import { useLive } from '../live/LiveProvider'
-import { usePrefs } from '../theme/PrefsProvider'
+import { useSession } from '../session/SessionProvider'
 import { Avatar } from './badges'
 import { Icon, type IconName } from './Icon'
+import { WorkspaceSwitcher } from './WorkspaceSwitcher'
 
 interface NavEntry {
   to: string
@@ -18,13 +19,14 @@ export const NAV: { section: string; items: NavEntry[] }[] = [
   {
     section: 'Мониторинг',
     items: [
-      { to: '/', label: 'Обзор', short: 'Обзор', icon: 'grid' },
-      { to: '/live', label: 'Live-лента', short: 'Live', icon: 'waveform' },
-      { to: '/alerts', label: 'Алерты', short: 'Алерты', icon: 'alert', badge: 'alerts' },
+      { to: '/app', label: 'Обзор', short: 'Обзор', icon: 'grid' },
+      { to: '/app/live', label: 'Live-лента', short: 'Live', icon: 'waveform' },
+      { to: '/app/alerts', label: 'Алерты', short: 'Алерты', icon: 'alert', badge: 'alerts' },
+      { to: '/app/clients', label: 'Клиенты', short: 'Клиенты', icon: 'people' },
     ],
   },
-  { section: 'Инструменты', items: [{ to: '/analyst', label: 'AI-аналитик', short: 'AI', icon: 'sparkles' }] },
-  { section: 'Система', items: [{ to: '/settings', label: 'Настройки', short: 'Настройки', icon: 'gear' }] },
+  { section: 'Инструменты', items: [{ to: '/app/analyst', label: 'AI-аналитик', short: 'AI', icon: 'sparkles' }] },
+  { section: 'Система', items: [{ to: '/app/settings', label: 'Настройки', short: 'Настройки', icon: 'gear' }] },
 ]
 
 export function LivePill() {
@@ -42,7 +44,7 @@ export function LivePill() {
 
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const { data: stats } = useStats()
-  const { prefs } = usePrefs()
+  const { user } = useSession()
   return (
     <aside className="sidebar" aria-label="Навигация">
       <div className="sidebar__brand">
@@ -54,6 +56,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
           <div className="sidebar__tag">AML Monitoring</div>
         </div>
       </div>
+      <WorkspaceSwitcher />
       <button type="button" className="sidebar__search" onClick={onSearch}>
         <Icon name="search" size={15} />
         Поиск и команды
@@ -64,7 +67,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
           <div key={group.section}>
             <div className="sidebar__section">{group.section}</div>
             {group.items.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav-item">
+              <NavLink key={item.to} to={item.to} end={item.to === '/app'} className="nav-item">
                 <Icon name={item.icon} size={18} />
                 {item.label}
                 {item.badge && stats ? <span className="nav-item__badge">{stats.open_alerts}</span> : null}
@@ -76,10 +79,10 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       <div className="sidebar__footer">
         <LivePill />
         <div className="user-chip">
-          <Avatar name={prefs.analystName} size={30} />
+          <Avatar name={user?.name ?? 'Гость'} size={30} />
           <div style={{ minWidth: 0 }}>
-            <div className="headline truncate" style={{ fontSize: 13.5 }}>{prefs.analystName}</div>
-            <div className="caption">Отдел мониторинга</div>
+            <div className="headline truncate" style={{ fontSize: 13.5 }}>{user?.name ?? 'Гость'}</div>
+            <div className="caption truncate">{user?.email ?? 'Без входа · демо'}</div>
           </div>
         </div>
       </div>
@@ -92,7 +95,7 @@ export function TabBar() {
   return (
     <nav className="tabbar" aria-label="Разделы">
       {NAV.flatMap((g) => g.items).map((item) => (
-        <NavLink key={item.to} to={item.to} end={item.to === '/'}>
+        <NavLink key={item.to} to={item.to} end={item.to === '/app'}>
           <Icon name={item.icon} size={24} strokeWidth={1.7} />
           {item.short}
           {item.badge && stats && stats.critical_alerts > 0 ? <span className="tabbar__dot">{stats.critical_alerts}</span> : null}

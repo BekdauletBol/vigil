@@ -5,7 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Account, Alert, AlertNote, AlertStatus, Severity, Transaction
-from app.realtime.bus import CHANNEL_ALERTS, EventBus
+from app.realtime.bus import EventBus, alerts_channel
 from app.schemas import (
     AlertDetail,
     AlertOut,
@@ -37,6 +37,7 @@ TRANSITIONS: dict[AlertStatus, set[AlertStatus]] = {
 
 async def list_alerts(
     session: AsyncSession,
+    workspace_id: int,
     *,
     status: AlertStatus | None = None,
     severity: Severity | None = None,
@@ -44,7 +45,7 @@ async def list_alerts(
     limit: int = 50,
     offset: int = 0,
 ) -> AlertPage:
-    filters = []
+    filters = [Alert.workspace_id == workspace_id]
     if status:
         filters.append(Alert.status == status)
     if severity:
@@ -62,7 +63,11 @@ async def list_alerts(
         base.order_by(Alert.created_at.desc(), Alert.id.desc()).limit(limit).offset(offset)
     )
 
-    count_rows = await session.execute(select(Alert.status, func.count()).group_by(Alert.status))
+    count_rows = await session.execute(
+        select(Alert.status, func.count())
+        .where(Alert.workspace_id == workspace_id)
+        .group_by(Alert.status)
+    )
     counts = {s.value: 0 for s in AlertStatus} | {s.value: n for s, n in count_rows.all()}
 
     return AlertPage(
@@ -72,15 +77,17 @@ async def list_alerts(
     )
 
 
-async def _get(session: AsyncSession, alert_id: int) -> Alert:
-    alert = await session.scalar(select(Alert).where(Alert.id == alert_id))
+async def _get(session: AsyncSession, workspace_id: int, alert_id: int) -> Alert:
+    alert = await session.scalar(
+        select(Alert).where(Alert.id == alert_id, Alert.workspace_id == workspace_id)
+    )
     if alert is None:
         raise NotFoundError(f"Alert {alert_id} not found")
     return alert
 
 
-async def get_alert_detail(session: AsyncSession, alert_id: int) -> AlertDetail:
-    alert = await _get(session, alert_id)
+async def get_alert_detail(session: AsyncSession, workspace_id: int, alert_id: int) -> AlertDetail:
+    alert = await _get(session, workspace_id, alert_id)
     subject = alert.account_id
     since = as_utc(alert.transaction.ts) - timedelta(days=7)
 
@@ -160,9 +167,9 @@ def build_graph(
 
 
 async def update_alert(
-    session: AsyncSession, alert_id: int, patch: AlertPatch, bus: EventBus
+    session: AsyncSession, workspace_id: int, alert_id: int, patch: AlertPatch, bus: EventBus
 ) -> AlertOut:
-    alert = await _get(session, alert_id)
+    alert = await _get(session, workspace_id, alert_id)
     changes: list[str] = []
 
     if patch.status and patch.status != alert.status:
@@ -189,13 +196,16 @@ async def update_alert(
     out = AlertOut.model_validate(alert)
     if changes:
         await bus.publish(
-            CHANNEL_ALERTS, {"type": "alert.updated", "data": out.model_dump(mode="json")}
+            alerts_channel(workspace_id),
+            {"type": "alert.updated", "data": out.model_dump(mode="json")},
         )
     return out
 
 
-async def add_note(session: AsyncSession, alert_id: int, note: NoteIn) -> AlertNote:
-    await _get(session, alert_id)
+async def add_note(
+    session: AsyncSession, workspace_id: int, alert_id: int, note: NoteIn
+) -> AlertNote:
+    await _get(session, workspace_id, alert_id)
     row = AlertNote(alert_id=alert_id, author=note.author, kind="comment", text=note.text)
     session.add(row)
     await session.commit()

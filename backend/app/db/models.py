@@ -15,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     Uuid,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -58,14 +59,54 @@ class TxStatus(enum.StrEnum):
     scored = "scored"
 
 
+class WorkspaceKind(enum.StrEnum):
+    demo = "demo"  # shared, public, fed by the simulator
+    private = "private"  # owned by a registered user
+
+
 def _enum(e: type[enum.Enum], name: str) -> Enum:
     return Enum(e, name=name, values_callable=lambda x: [m.value for m in x])
 
 
+DEMO_WORKSPACE_ID = 1
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(254), unique=True)
+    name: Mapped[str] = mapped_column(String(80))
+    password_hash: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Workspace(Base):
+    """Tenant boundary: every account, transaction and case belongs to exactly one workspace."""
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(80))
+    kind: Mapped[WorkspaceKind] = mapped_column(_enum(WorkspaceKind, "workspace_kind"))
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # Integration key for external systems; only a hash is stored, the key is shown once.
+    api_key_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+    api_key_prefix: Mapped[str | None] = mapped_column(String(16))
+    simulator_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Account(Base):
     __tablename__ = "accounts"
+    __table_args__ = (UniqueConstraint("workspace_id", "code", name="uq_accounts_workspace_code"),)
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    # The client's identifier in the source system; integrations reference accounts by it.
+    code: Mapped[str] = mapped_column(String(64))
     name: Mapped[str] = mapped_column(String(200))
     kind: Mapped[AccountKind] = mapped_column(_enum(AccountKind, "account_kind"))
     tax_id: Mapped[str] = mapped_column(String(12))  # ИИН / БИН (synthetic)
@@ -81,14 +122,16 @@ class Transaction(Base):
     __tablename__ = "transactions"
     __table_args__ = (
         Index("ix_transactions_sender_ts", "sender_id", "ts"),
-        Index("ix_transactions_ts", "ts"),
+        Index("ix_transactions_workspace_ts", "workspace_id", "ts"),
+        UniqueConstraint("workspace_id", "external_id", name="uq_transactions_workspace_external"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    external_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    external_id: Mapped[str | None] = mapped_column(String(64))
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    sender_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
-    receiver_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    sender_id: Mapped[str] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"))
+    receiver_id: Mapped[str] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"))
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 2))
     currency: Mapped[str] = mapped_column(String(3), default="KZT")
     channel: Mapped[str] = mapped_column(String(20))
@@ -105,11 +148,16 @@ class Transaction(Base):
 
 class Alert(Base):
     __tablename__ = "alerts"
-    __table_args__ = (Index("ix_alerts_status_created", "status", "created_at"),)
+    __table_args__ = (
+        Index("ix_alerts_workspace_status_created", "workspace_id", "status", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    transaction_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("transactions.id"), unique=True)
-    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"))
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"))
+    transaction_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("transactions.id", ondelete="CASCADE"), unique=True
+    )
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id", ondelete="CASCADE"))
     severity: Mapped[Severity] = mapped_column(_enum(Severity, "severity"))
     status: Mapped[AlertStatus] = mapped_column(
         _enum(AlertStatus, "alert_status"), default=AlertStatus.open

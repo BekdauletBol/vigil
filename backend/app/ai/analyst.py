@@ -65,11 +65,13 @@ def _case_block(alert: dict) -> str:
     return json.dumps(compact, ensure_ascii=False, default=str, indent=1)
 
 
-async def prepare_context(session: AsyncSession, req: ChatRequest) -> dict:
+async def prepare_context(session: AsyncSession, workspace_id: int, req: ChatRequest) -> dict:
     """Load the case and retrieve knowledge before streaming starts (the DB session closes then)."""
     alert = None
     if req.alert_id is not None:
-        alert = (await get_alert_detail(session, req.alert_id)).model_dump(mode="json")
+        alert = (await get_alert_detail(session, workspace_id, req.alert_id)).model_dump(
+            mode="json"
+        )
 
     question = req.messages[-1].content
     retriever = get_retriever()

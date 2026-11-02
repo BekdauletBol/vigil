@@ -14,6 +14,8 @@ Fullstack-проект: система финансового мониторин
 > Все клиенты, банки и операции сгенерированы синтетически. Пороговые значения и база
 > знаний учебные и не являются нормативными документами.
 
+![Лендинг](docs/screenshots/landing.jpg)
+
 ![Обзор](docs/screenshots/overview.png)
 
 <table>
@@ -28,6 +30,13 @@ Fullstack-проект: система финансового мониторин
   <tr>
     <td><img src="docs/screenshots/alert.png" alt="Карточка кейса"></td>
     <td><img src="docs/screenshots/palette.png" alt="Палитра команд ⌘K"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/onboarding.png" alt="Онбординг пустого пространства"></td>
+    <td><img src="docs/screenshots/import.png" alt="Импорт CSV с отчётом по строкам"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/integration.png" alt="API-ключ и интеграция"></td>
   </tr>
 </table>
 <p align="center"><img src="docs/screenshots/mobile.png" width="300" alt="Мобильная версия"></p>
@@ -69,6 +78,26 @@ flowchart LR
 воркер считает признаки (частота за 10 минут, повторы сумм у порога, возраст счёта, ПДЛ,
 юрисдикция), прогоняет правила и ML-модель, при риске ≥ 65 создаёт алерт →
 публикует событие в Redis → все реплики API раздают его клиентам по WebSocket и SSE.
+
+## Демо и свои данные
+
+- **Попробовать демо** — кнопка на главной открывает общее «Демо-банк» пространство без регистрации:
+  симулятор шлёт операции, кейсы уже наполовину разобраны.
+- **Своё пространство** — после регистрации (email + пароль) вы получаете пустое личное пространство.
+  Данные изолированы: чужие пространства недоступны (404), без токена — 401. Можно завести несколько пространств.
+- **Как попадают данные** — так же, как в реальной системе мониторинга:
+  1. **API-интеграция** — выпустите API-ключ в настройках и шлите операции из своей системы
+     (`X-API-Key`, идемпотентно по `external_id`). Ключ хранится только в виде SHA-256-хеша и показывается один раз.
+  2. **Импорт CSV** — выгрузка из банка; ошибки возвращаются построчно, неизвестные клиенты создаются автоматически.
+  3. **Формы** — добавить клиента и провести операцию вручную, сразу увидеть риск.
+  4. **Тестовые данные и симулятор** — 25 клиентов и сутки истории в один клик, живой поток на 30 минут.
+
+```bash
+curl -X POST https://vigil-aml.onrender.com/api/v1/transactions \
+  -H "X-API-Key: vk_…" -H "Content-Type: application/json" \
+  -d '{"external_id": "BANK-42", "sender_id": "CL-00001", "receiver_id": "CL-00002",
+       "amount": 9500000, "channel": "swift", "country": "VG"}'
+```
 
 ## Возможности
 
@@ -139,7 +168,8 @@ ANTHROPIC_API_KEY=sk-ant-... docker compose up -d
 `Dockerfile.demo` собирает фронтенд и бэкенд в один образ: FastAPI отдаёт и API, и SPA,
 база — SQLite, шина событий — in-memory, скоринг — в запросе, симулятор встроен.
 Redis и Celery не нужны, образ укладывается в 512 МБ. `render.yaml` описывает
-сервис для деплоя в один клик.
+сервис и бесплатную базу PostgreSQL для деплоя в один клик: с базой аккаунты пользователей
+переживают перезапуски, а старая история демо автоматически удаляется через 48 часов.
 
 ```bash
 docker build -f Dockerfile.demo -t vigil-demo . && docker run -p 8000:8000 vigil-demo
@@ -164,7 +194,13 @@ cd backend && TEST_DATABASE_URL=postgresql+asyncpg://vigil:vigil@localhost:5432/
 
 | Метод | Путь | Описание |
 |---|---|---|
-| `POST` | `/api/v1/transactions` | Приём операции от внешней системы (202, идемпотентно) |
+| `POST` | `/api/v1/auth/register` · `/auth/login` · `GET /auth/me` | Регистрация и вход (JWT), список пространств |
+| `GET` `POST` `PATCH` | `/api/v1/workspaces` | Пространства: создать, переименовать, включить симулятор |
+| `POST` | `/api/v1/workspaces/{id}/api-key` | Выпустить API-ключ (показывается один раз) |
+| `POST` `DELETE` | `/api/v1/workspaces/{id}/sample-data` · `/data` | Тестовые данные · очистка |
+| `GET` `POST` | `/api/v1/accounts` | Клиенты пространства |
+| `POST` | `/api/v1/transactions` | Приём операции (`X-API-Key` или JWT; 202, идемпотентно; `?wait=true` — сразу с риском) |
+| `POST` | `/api/v1/transactions/import` | Импорт CSV с отчётом по строкам; шаблон — `GET …/import/template` |
 | `GET` | `/api/v1/transactions` | Последние операции, фильтр `min_score` |
 | `GET` | `/api/v1/alerts` | Кейсы: `status`, `severity`, `q`, пагинация, счётчики |
 | `GET` | `/api/v1/alerts/{id}` | Кейс + субъект + операции + граф связей + журнал |
@@ -176,6 +212,9 @@ cd backend && TEST_DATABASE_URL=postgresql+asyncpg://vigil:vigil@localhost:5432/
 | `WS` | `/api/v1/ws/transactions` | Снимок + поток операций, ping/pong |
 | `GET` | `/api/v1/events` | SSE: `alert.created`, `alert.updated` |
 | `GET` | `/api/v1/health/ready` | Готовность: БД и Redis |
+
+Все эндпоинты данных работают в контексте пространства: заголовок `X-Workspace-Id` + `Authorization: Bearer <JWT>`
+(для WebSocket и SSE — query-параметры `workspace` и `token`), либо `X-API-Key`. Без них — публичное демо.
 
 ## Структура
 
@@ -205,7 +244,7 @@ frontend/
 REST API · WebSocket и SSE · интерфейс для LLM-сервиса со стримингом · тесты frontend ·
 Docker и CI/CD · Git.
 
-**Backend:** Python · FastAPI · PostgreSQL и SQL (агрегации, индексы, миграции Alembic) ·
+**Backend:** Python · FastAPI · аутентификация (scrypt, JWT, API-ключи) и мульти-тенантность · PostgreSQL и SQL (агрегации, индексы, миграции Alembic с переносом данных) ·
 REST API и интеграция с внешней системой · Docker · Linux-контейнеры · Celery и Redis ·
 WebSocket · AI/LLM (RAG, локальные модели через Ollama) · ML (IsolationForest) ·
 GitHub Actions и GitLab CI.

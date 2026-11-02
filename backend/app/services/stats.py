@@ -17,10 +17,11 @@ def _minute_bucket(session: AsyncSession):
     return func.strftime("%Y-%m-%d %H:%M:00", Transaction.ts)
 
 
-async def compute_stats(session: AsyncSession, minutes: int = 60) -> Stats:
+async def compute_stats(session: AsyncSession, workspace_id: int, minutes: int = 60) -> Stats:
     now = datetime.now(UTC)
     day_ago = now - timedelta(hours=24)
-    scored = Transaction.status == TxStatus.scored
+    scored = (Transaction.status == TxStatus.scored) & (Transaction.workspace_id == workspace_id)
+    in_ws = Alert.workspace_id == workspace_id
 
     totals = (
         await session.execute(
@@ -66,16 +67,18 @@ async def compute_stats(session: AsyncSession, minutes: int = 60) -> Stats:
 
     sev_rows = await session.execute(
         select(Alert.severity, func.count())
-        .where(Alert.status != AlertStatus.closed)
+        .where(in_ws, Alert.status != AlertStatus.closed)
         .group_by(Alert.severity)
     )
     by_severity = {s.value: 0 for s in Severity} | {s.value: n for s, n in sev_rows.all()}
-    status_rows = await session.execute(select(Alert.status, func.count()).group_by(Alert.status))
+    status_rows = await session.execute(
+        select(Alert.status, func.count()).where(in_ws).group_by(Alert.status)
+    )
     by_status = {s.value: 0 for s in AlertStatus} | {s.value: n for s, n in status_rows.all()}
 
     # Flags live in a JSON column; counting them in Python keeps the query portable.
     flag_lists = await session.scalars(
-        select(Alert.flags).where(Alert.created_at >= now - timedelta(days=7))
+        select(Alert.flags).where(in_ws, Alert.created_at >= now - timedelta(days=7))
     )
     # ML anomaly is a model signal, not a typology — keep it out of this breakdown.
     typologies = Counter(

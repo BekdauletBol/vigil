@@ -10,6 +10,7 @@ export interface Flag {
 
 export interface AccountBrief {
   id: string
+  code: string
   name: string
   kind: 'individual' | 'legal'
   bank: string
@@ -131,4 +132,55 @@ export interface AlertFilters {
   status?: AlertStatus
   severity?: Severity
   q?: string
+}
+
+export interface User {
+  id: number
+  email: string
+  name: string
+}
+
+export interface Workspace {
+  id: number
+  name: string
+  kind: 'demo' | 'private'
+  api_key_prefix: string | null
+  simulator_until: string | null
+  created_at: string
+  accounts: number
+  transactions: number
+}
+
+export interface AuthResponse {
+  token: string
+  user: User
+  workspaces: Workspace[]
+}
+
+export interface AccountInput {
+  code?: string
+  name: string
+  kind: 'individual' | 'legal'
+  tax_id?: string
+  bank?: string
+  country: string
+  city?: string
+  is_pep: boolean
+}
+
+export interface TransactionInput {
+  sender_id: string
+  receiver_id: string
+  amount: number
+  channel: Channel
+  country: string
+  purpose?: string
+}
+
+export interface ImportResult {
+  imported: number
+  duplicates: number
+  created_clients: number
+  alerts: number
+  errors: { row: number; message: string }[]
 }
