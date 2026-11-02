@@ -98,3 +98,12 @@ def test_database_url_gets_async_driver():
     assert (
         Settings(database_url="sqlite+aiosqlite:///x.db").database_url == "sqlite+aiosqlite:///x.db"
     )
+
+
+def test_neon_style_url_is_adapted_for_asyncpg():
+    from app.core.config import Settings
+
+    url = "postgresql://u:p@ep-x.neon.tech/db?sslmode=require&channel_binding=require"
+    assert Settings(database_url=url).database_url == (
+        "postgresql+asyncpg://u:p@ep-x.neon.tech/db?ssl=require"
+    )

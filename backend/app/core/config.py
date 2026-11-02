@@ -19,10 +19,21 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def async_driver(cls, v: str) -> str:
-        # Hosting providers hand out plain postgres:// URLs; SQLAlchemy async needs asyncpg.
+        """Accept URLs as hosting providers hand them out (Render, Neon, Supabase).
+
+        SQLAlchemy async needs the asyncpg driver, and asyncpg takes `ssl=` instead of
+        libpq's `sslmode=` and does not know `channel_binding`.
+        """
         for prefix in ("postgres://", "postgresql://"):
             if v.startswith(prefix):
-                return "postgresql+asyncpg://" + v[len(prefix) :]
+                v = "postgresql+asyncpg://" + v[len(prefix) :]
+        if v.startswith("postgresql+asyncpg://") and "?" in v:
+            base, _, query = v.partition("?")
+            params = [p for p in query.split("&") if p and not p.startswith("channel_binding=")]
+            params = [
+                ("ssl=" + p.split("=", 1)[1]) if p.startswith("sslmode=") else p for p in params
+            ]
+            v = base + ("?" + "&".join(params) if params else "")
         return v
 
     # "redis" fans events out across API replicas and the Celery worker;
